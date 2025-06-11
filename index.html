@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sakura Sushi - Доставка японской кухни</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=mid=1wpKVuOKlHhJUb6M993AWk-6GaxdgTNtu&hl=ru&ehbc=2E312F" width="640" height="480"&callback=initMap" async defer></script>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f9f1f4; /* Sakura pink background */
+    }
+    .sakura-logo {
+      background-image: url('https://via.placeholder.com/50?text=🌸'); /* Placeholder sakura logo */
+      background-size: contain;
+      width: 50px;
+      height: 50px;
+    }
+    .japanese-text {
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-white shadow-md sticky top-0 z-10">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-4">
+        <div class="sakura-logo"></div>
+        <h1 class="text-2xl font-bold text-gray-800">Sakura Sushi</h1>
+      </div>
+      <nav class="flex space-x-6">
+        <a href="ramen" class="text-gray-600 hover:text-pink-600">Рамёны</a>
+        <a href="#rolls" class="text-gray-600 hover:text-pink-600">Роллы</a>
+        <a href="#wok" class="text-gray-600 hover:text-pink-600">WOK</a>
+      </nav>
+      <div class="flex items-center space-x-4">
+        <input type="text" id="search" placeholder="Поиск..." class="border rounded-lg px-3 py-1">
+        <button id="cart-btn" class="text-gray-600 hover:text-pink-600">🛒 Корзина (<span id="cart-count">0</span>)</button>
+        <button id="auth-btn" class="text-gray-600 hover:text-pink-600">Войти</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-4 py-8 flex-grow">
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 id="auth-title" class="text-xl font-bold mb-4">Вход / Регистрация</h2>
+        <input id="phone-input" type="tel" placeholder="Номер телефона" class="w-full border rounded-lg px-3 py-2 mb-4">
+        <button id="send-sms" class="w-full bg-pink-600 text-white py-2 rounded-lg">Отправить код</button>
+        <div id="sms-verification" class="hidden mt-4">
+          <input id="sms-code" type="text" placeholder="Введите код из СМС" class="w-full border rounded-lg px-3 py-2 mb-4">
+          <button id="verify-sms" class="w-full bg-pink-600 text-white py-2 rounded-lg">Подтвердить</button>
+        </div>
+        <button id="close-auth" class="mt-4 text-gray-600">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- Admin Modal -->
+    <div id="admin-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-xl font-bold mb-4">Админ-панель</h2>
+        <input id="admin-phone-search" type="tel" placeholder="Поиск по номеру телефона" class="w-full border rounded-lg px-3 py-2 mb-4">
+        <button id="admin-search-btn" class="w-full bg-pink-600 text-white py-2 rounded-lg">Найти</button>
+        <div id="admin-user-info" class="mt-4"></div>
+        <button id="close-admin" class="mt-4 text-gray-600">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- Courier Modal -->
+    <div id="courier-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-xl font-bold mb-4">Курьер-панель</h2>
+        <div id="courier-orders" class="mt-4"></div>
+        <button id="update-location" class="w-full bg-pink-600 text-white py-2 rounded-lg mt-4">Обновить местоположение</button>
+        <button id="close-courier" class="mt-4 text-gray-600">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+        <h2 class="text-xl font-bold mb-4">Корзина</h2>
+        <div id="cart-items"></div>
+        <div class="mt-4">
+          <input id="address" type="text" placeholder="Адрес доставки" class="w-full border rounded-lg px-3 py-2 mb-2">
+          <select id="payment-type" class="w-full border rounded-lg px-3 py-2 mb-2">
+            <option value="cash">Наличные</option>
+            <option value="card">Карта</option>
+          </select>
+          <input id="persons" type="number" min="1" placeholder="Количество персон" class="w-full border rounded-lg px-3 py-2 mb-2">
+          <button id="place-order" class="w-full bg-pink-600 text-white py-2 rounded-lg">Оформить заказ</button>
+        </div>
+        <button id="close-cart" class="mt-4 text-gray-600">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- Order History -->
+    <section id="order-history" class="hidden mb-8">
+      <h2 class="text-2xl font-bold mb-4">История заказов</h2>
+      <div id="orders"></div>
+    </section>
+
+    <!-- Delivery Tracking -->
+    <section id="delivery-tracking" class="hidden mb-8">
+      <h2 class="text-2xl font-bold mb-4">Отслеживание доставки</h2>
+      <div id="map" class="h-96 w-full"></div>
+    </section>
+
+    <!-- Catalog -->
+    <section id="ramen" class="mb-12">
+      <h2 class="text-2xl font-bold mb-4 japanese-text">Рамёны</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="ramen-items"></div>
+    </section>
+    <section id="rolls" class="mb-12">
+      <h2 class="text-2xl font-bold mb-4 japanese-text">Роллы</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="rolls-items"></div>
+    </section>
+    <section id="wok" class="mb-12">
+      <h2 class="text-2xl font-bold mb-4 japanese-text">WOK</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="wok-items"></div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-white py-6">
+    <div class="container mx-auto px-4 flex flex-col sm:flex-row justify-between items-center">
+      <div>
+        <p>Горячая линия: 123-456-789</p>
+        <p>Адрес: Павлова 68</p>
+      </div>
+      <div class="flex space-x-4 mt-4 sm:mt-0">
+        <a href="https://instagram.com" target="_blank"><img src="https://via.placeholder.com/30?text=📸" alt="Instagram"></a>
+        <a href="https://telegram.org" target="_blank"><img src="https://via.placeholder.com/30?text=✈️" alt="Telegram"></a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Simulated database
+    let users = JSON.parse(localStorage.getItem('users')) || {};
+    let orders = JSON.parse(localStorage.getItem('orders')) || [];
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    let currentUser = null;
+    let couriers = [
+      { id: 1, name: 'Иван', lat: 55.7558, lng: 37.6173 },
+      { id: 2, name: 'Анна', lat: 55.7558, lng: 37.6173 }
+    ];
+
+    // Catalog items
+    const catalog = {
+      ramen: [
+        { id: 1, name: 'Нигири с лососем', price: 150, img: 'https://source.unsplash.com/random/200x200?ramen1' },
+        { id: 2, name: 'Нигири с тунцом', price: 160, img: 'https://source.unsplash.com/random/200x200?ramen2' },
+        { id: 3, name: 'Нигири с креветкой', price: 140, img: 'https://source.unsplash.com/random/200x200?ramen3' },
+        { id: 4, name: 'Нигири с угрем', price: 180, img: 'https://source.unsplash.com/random/200x200?ramen4' },
+        { id: 5, name: 'Нигири с крабом', price: 170, img: 'https://source.unsplash.com/random/200x200?ramen5' },
+        { id: 6, name: 'Нигири с авокадо', price: 120, img: 'https://source.unsplash.com/random/200x200?ramen6' }
+      ],
+      rolls: [
+        { id: 7, name: 'Калифорния', price: 350, img: 'https://source.unsplash.com/random/200x200?roll1' },
+        { id: 8, name: 'Филадельфия', price: 380, img: 'https://source.unsplash.com/random/200x200?roll2' },
+        { id: 9, name: 'Дракон', price: 400, img: 'https://source.unsplash.com/random/200x200?roll3' },
+        { id: 10, name: 'Спайси тунец', price: 360, img: 'https://source.unsplash.com/random/200x200?roll4' },
+        { id: 11, name: 'Вегетарианский ролл', price: 300, img: 'https://source.unsplash.com/random/200x200?roll5' },
+        { id: 12, name: 'Темпура ролл', price: 370, img: 'https://source.unsplash.com/random/200x200?roll6' }
+      ],
+      wok: [
+        { id: 13, name: 'WOK с курицей', price: 320, img: 'https://source.unsplash.com/random/200x200?wok1' },
+        { id: 14, name: 'WOK с говядиной', price: 350, img: 'https://source.unsplash.com/random/200x200?wok2' },
+        { id: 15, name: 'WOK с креветками', price: 380, img: 'https://source.unsplash.com/random/200x200?wok3' },
+        { id: 16, name: 'WOK с тофу', price: 300, img: 'https://source.unsplash.com/random/200x200?wok4' },
+        { id: 17, name: 'WOK с овощами', price: 280, img: 'https://source.unsplash.com/random/200x200?wok5' },
+        { id: 18, name: 'WOK с морепродуктами', price: 400, img: 'https://source.unsplash.com/random/200x200?wok6' }
+      ]
+    };
+
+    // Render catalog
+    function renderCatalog() {
+      ['ramen', 'rolls', 'wok'].forEach(section => {
+        const container = document.getElementById(`${section}-items`);
+        container.innerHTML = catalog[section].map(item => `
+          <div class="bg-white p-4 rounded-lg shadow-md">
+            <img src="${item.img}" alt="${item.name}" class="w-full h-48 object-cover rounded-lg mb-4">
+            <h3 class="text-lg font-semibold">${item.name}</h3>
+            <p class="text-gray-600">${item.price} ₽</p>
+            <button onclick="addToCart(${item.id}, '${item.name}', ${item.price})" class="mt-2 bg-pink-600 text-white px-4 py-2 rounded-lg">Добавить в корзину</button>
+          </div>
+        `).join('');
+      });
+    }
+
+    // Cart management
+    function addToCart(id, name, price) {
+      const existing = cart.find(item => item.id === id);
+      if (existing) {
+        existing.quantity++;
+      } else {
+        cart.push({ id, name, price, quantity: 1 });
+      }
+      updateCart();
+    }
+
+    function updateCart() {
+      localStorage.setItem('cart', JSON.stringify(cart));
+      document.getElementById('cart-count').textContent = cart.reduce((sum, item) => sum + item.quantity, 0);
+      const cartItems = document.getElementById('cart-items');
+      cartItems.innerHTML = cart.map(item => `
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <p>${item.name}</p>
+            <p>${item.price} ₽ x ${item.quantity} = ${item.price * item.quantity} ₽</p>
+          </div>
+          <div>
+            <button onclick="updateCartQuantity(${item.id}, -1)" class="bg-gray-200 px-2 py-1 rounded">-</button>
+            <button onclick="updateCartQuantity(${item.id}, 1)" class="bg-gray-200 px-2 py-1 rounded">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateCartQuantity(id, change) {
+      const item = cart.find(item => item.id === id);
+      if (item) {
+        item.quantity += change;
+        if (item.quantity <= 0) {
+          cart = cart.filter(i => i.id !== id);
+        }
+        updateCart();
+      }
+    }
+
+    // Authentication
+    document.getElementById('auth-btn').addEventListener('click', () => {
+      document.getElementById('auth-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('close-auth').addEventListener('click', () => {
+      document.getElementById('auth-modal').classList.add('hidden');
+    });
+
+    document.getElementById('send-sms').addEventListener('click', () => {
+      const phone = document.getElementById('phone-input').value;
+      if (phone) {
+        // Simulate SMS sending
+        alert('Код отправлен на ' + phone);
+        document.getElementById('sms-verification').classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('verify-sms').addEventListener('click', () => {
+      const phone = document.getElementById('phone-input').value;
+      const code = document.getElementById('sms-code').value;
+      if (code === '1234') { // Simulated code
+        if (!users[phone]) {
+          users[phone] = { phone, orders: [] };
+          localStorage.setItem('users', JSON.stringify(users));
+        }
+        currentUser = phone;
+        document.getElementById('auth-btn').textContent = `Выйти (${phone})`;
+        document.getElementById('auth-modal').classList.add('hidden');
+        document.getElementById('order-history').classList.remove('hidden');
+        if (phone === 'admin') {
+          document.getElementById('auth-btn').innerHTML += ' | <button id="admin-btn">Админ</button>';
+          document.getElementById('admin-btn').addEventListener('click', () => {
+            document.getElementById('admin-modal').classList.remove('hidden');
+          });
+        } else if (phone.startsWith('courier')) {
+          document.getElementById('auth-btn').innerHTML += ' | <button id="courier-btn">Курьер</button>';
+          document.getElementById('courier-btn').addEventListener('click', () => {
+            document.getElementById('courier-modal').classList.remove('hidden');
+            renderCourierOrders();
+          });
+        }
+        renderOrders();
+      } else {
+        alert('Неверный код');
+      }
+    });
+
+    // Cart handling
+    document.getElementById('cart-btn').addEventListener('click', () => {
+      if (!currentUser) {
+        alert('Пожалуйста, войдите в систему');
+        return;
+      }
+      document.getElementById('cart-modal').classList.remove('hidden');
+      updateCart();
+    });
+
+    document.getElementById('close-cart').addEventListener('click', () => {
+      document.getElementById('cart-modal').classList.add('hidden');
+    });
+
+    document.getElementById('place-order').addEventListener('click', () => {
+      if (!currentUser) {
+        alert('Пожалуйста, войдите в систему');
+        return;
+      }
+      const address = document.getElementById('address').value;
+      const paymentType = document.getElementById('payment-type').value;
+      const persons = document.getElementById('persons').value;
+      if (address && paymentType && persons && cart.length > 0) {
+        const order = {
+          id: Date.now(),
+          user: currentUser,
+          items: [...cart],
+          address,
+          paymentType,
+          persons,
+          status: 'Принят',
+          courier: null,
+          timestamp: new Date().toISOString()
+        };
+        orders.push(order);
+        users[currentUser].orders.push(order.id);
+        localStorage.setItem('orders', JSON.stringify(orders));
+        localStorage.setItem('users', JSON.stringify(users));
+        cart = [];
+        updateCart();
+        document.getElementById('cart-modal').classList.add('hidden');
+        renderOrders();
+      } else {
+        alert('Заполните все поля и добавьте товары в корзину');
+      }
+    });
+
+    // Order history
+    function renderOrders() {
+      if (!currentUser) return;
+      const userOrders = orders.filter(order => order.user === currentUser);
+      document.getElementById('orders').innerHTML = userOrders.map(order => `
+        <div class="bg-white p-4 rounded-lg shadow-md mb-4">
+          <p>Заказ #${order.id}</p>
+          <p>Статус: ${order.status}</p>
+          <p>Адрес: ${order.address}</p>
+          <p>Оплата: ${order.paymentType === 'cash' ? 'Наличные' : 'Карта'}</p>
+          <p>Персон: ${order.persons}</p>
+          <p>Товары: ${order.items.map(item => `${item.name} x${item.quantity}`).join(', ')}</p>
+          ${order.status === 'В пути' ? `<button onclick="trackOrder(${order.id})" class="bg-pink-600 text-white px-4 py-2 rounded-lg mt-2">Отследить</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // Admin panel
+    document.getElementById('admin-search-btn').addEventListener('click', () => {
+      const phone = document.getElementById('admin-phone-search').value;
+      if (users[phone]) {
+        const userOrders = orders.filter(order => order.user === phone);
+        document.getElementById('admin-user-info').innerHTML = `
+          <p>Телефон: ${phone}</p>
+          <h3 class="text-lg font-semibold mt-4">История заказов:</h3>
+          ${userOrders.map(order => `
+            <div class="bg-gray-100 p-4 rounded-lg mb-4">
+              <p>Заказ #${order.id}</p>
+              <p>Статус: ${order.status}</p>
+              <p>Адрес: ${order.address}</p>
+              <p>Товары: ${order.items.map(item => `${item.name} x${item.quantity}`).join(', ')}</p>
+              <select onchange="updateOrderStatus(${order.id}, this.value)">
+                <option value="Принят" ${order.status === 'Принят' ? 'selected' : ''}>Принят</option>
+                <option value="Готовится" ${order.status === 'Готовится' ? 'selected' : ''}>Готовится</option>
+                <option value="В пути" ${order.status === 'В пути' ? 'selected' : ''}>В пути</option>
+                <option value="Закрыт" ${order.status === 'Закрыт' ? 'selected' : ''}>Закрыт</option>
+              </select>
+              ${order.status === 'В пути' ? `
+                <select onchange="assignCourier(${order.id}, this.value)">
+                  <option value="">Выберите курьера</option>
+                  ${couriers.map(courier => `<option value="${courier.id}" ${order.courier === courier.id ? 'selected' : ''}>${courier.name}</option>`).join('')}
+                </select>
+              ` : ''}
+            </div>
+          `).join('')}
+        `;
+      } else {
+        document.getElementById('admin-user-info').innerHTML = '<p>Пользователь не найден</p>';
+      }
+    });
+
+    document.getElementById('close-admin').addEventListener('click', () => {
+      document.getElementById('admin-modal').classList.add('hidden');
+    });
+
+    function updateOrderStatus(orderId, status) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        order.status = status;
+        if (status !== 'В пути') order.courier = null;
+        localStorage.setItem('orders', JSON.stringify(orders));
+        renderOrders();
+        document.getElementById('admin-search-btn').click();
+      }
+    }
+
+    function assignCourier(orderId, courierId) {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        order.courier = parseInt(courierId);
+        localStorage.setItem('orders', JSON.stringify(orders));
+        renderOrders();
+      }
+    }
+
+    // Courier panel
+    function renderCourierOrders() {
+      const courierId = parseInt(currentUser.replace('courier', ''));
+      const courierOrders = orders.filter(order => order.courier === courierId && order.status === 'В пути');
+      document.getElementById('courier-orders').innerHTML = courierOrders.map(order => `
+        <div class="bg-gray-100 p-4 rounded-lg mb-4">
+          <p>Заказ #${order.id}</p>
+          <p>Адрес: ${order.address}</p>
+          <p>Товары: ${order.items.map(item => `${item.name} x${item.quantity}`).join(', ')}</p>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('close-courier').addEventListener('click', () => {
+      document.getElementById('courier-modal').classList.add('hidden');
+    });
+
+    document.getElementById('update-location').addEventListener('click', () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          const courierId = parseInt(currentUser.replace('courier', ''));
+          const courier = couriers.find(c => c.id === courierId);
+          if (courier) {
+            courier.lat = position.coords.latitude;
+            courier.lng = position.coords.longitude;
+            alert('Местоположение обновлено');
+          }
+        });
+      } else {
+        alert('Геолокация не поддерживается');
+      }
+    });
+
+    // Google Maps
+    let map, marker;
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 55.7558, lngVlng: 37.6173 },
+        zoom: 12
+      });
+    }
+
+    function trackOrder(orderId) {
+      const order = orders.find(o => o.id === orderId);
+      if (order && order.courier) {
+        document.getElementById('delivery-tracking').classList.remove('hidden');
+        const courier = couriers.find(c => c.id === order.courier);
+        if (courier) {
+          map.setCenter({ lat: courier.lat, lng: courier.lng });
+          if (marker) marker.setMap(null);
+          marker = new google.maps.Marker({
+            position: { lat: courier.lat, lng: courier.lng },
+            map: map,
+            title: courier.name
+          });
+        }
+      }
+    }
+
+    // Search functionality
+    document.getElementById('search').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      ['ramen', 'rolls', 'wok'].forEach(section => {
+        const container = document.getElementById(`${section}-items`);
+        container.innerHTML = catalog[section]
+          .filter(item => item.name.toLowerCase().includes(query))
+          .map(item => `
+            <div class="bg-white p-4 rounded-lg shadow-md">
+              <img src="${item.img}" alt="${item.name}" class="w-full h-48 object-cover rounded-lg mb-4">
+              <h3 class="text-lg font-semibold">${item.name}</h3>
+              <p class="text-gray-600">${item.price} ₽</p>
+              <button onclick="addToCart(${item.id}, '${item.name}', ${item.price})" class="mt-2 bg-pink-600 text-white px-4 py-2 rounded-lg">Добавить в корзину</button>
+            </div>
+          `).join('');
+      });
+    });
+
+    // Initialize
+    renderCatalog();
+    updateCart();
+  </script>
+  
+</body>
+</html>
